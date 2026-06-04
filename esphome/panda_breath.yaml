@@ -1,0 +1,238 @@
+esphome:
+  name: panda-breath
+  friendly_name: Panda Breath
+
+esp32:
+  board: esp32-c3-devkitm-1
+  variant: esp32c3
+  flash_size: 4MB
+  partitions: partitions.csv
+  framework:
+    type: esp-idf
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "Panda Breath Fallback"
+
+captive_portal:
+
+api:
+
+web_server:
+  version: 3
+  sorting_groups:
+    - id: grp_temperature
+      name: "Temperature"
+      sorting_weight: -50
+    - id: grp_buttons
+      name: "Buttons"
+      sorting_weight: -40
+    - id: grp_leds
+      name: "LEDs"
+      sorting_weight: -30
+    - id: grp_control
+      name: "Control"
+      sorting_weight: -20
+    - id: grp_unknown
+      name: "Unknown"
+      sorting_weight: -10
+
+ota:
+  platform: esphome
+
+# UART0 (GPIO 20/21) is wired to the CH342 USB-to-serial bridge for flashing only
+logger:
+  level: NONE
+
+# ── Temperature sensors (ADC) ─────────────────────────────────────────────────
+sensor:
+  - platform: adc
+    pin: GPIO0
+    id: chamber_adc_raw
+    internal: true
+    update_interval: 1s
+    attenuation: 12dB
+
+  - platform: resistance
+    sensor: chamber_adc_raw
+    id: chamber_resistance
+    internal: true
+    configuration: DOWNSTREAM
+    resistor: 82kΩ
+
+  - platform: ntc
+    sensor: chamber_resistance
+    id: chamber_temp
+    name: "Chamber Temperature"
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    calibration:
+      b_constant: 3950
+      reference_temperature: 25°C
+      reference_resistance: 100kΩ
+    web_server:
+      sorting_group_id: grp_temperature
+      sorting_weight: 1
+
+  - platform: adc
+    pin: GPIO1
+    id: ptc_adc_raw
+    internal: true
+    update_interval: 1s
+    attenuation: 12dB
+
+  - platform: resistance
+    sensor: ptc_adc_raw
+    id: ptc_resistance
+    internal: true
+    configuration: DOWNSTREAM
+    resistor: 82kΩ
+
+  - platform: ntc
+    sensor: ptc_resistance
+    id: ptc_temp
+    name: "PTC Element Temperature"
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    calibration:
+      b_constant: 3950
+      reference_temperature: 25°C
+      reference_resistance: 100kΩ
+    web_server:
+      sorting_group_id: grp_temperature
+      sorting_weight: 2
+
+  - platform: pulse_counter
+    pin:
+      number: GPIO7
+      mode:
+        input: true
+        pullup: true
+    name: "Power Frequency"
+    id: gpio_7_freq
+    update_interval: 2s
+    unit_of_measurement: "Hz"
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.016667  # pulses/min → Hz
+    web_server:
+      sorting_group_id: grp_control
+      sorting_weight: 3
+
+# ── Binary sensors / buttons ──────────────────────────────────────────────────
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO2
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    name: "Filament Drying Button"
+    id: btn_filament_dry
+    web_server:
+      sorting_group_id: grp_buttons
+      sorting_weight: 1
+
+  - platform: gpio
+    pin:
+      number: GPIO8
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    name: "Heating Auto Button"
+    id: btn_heat_auto
+    web_server:
+      sorting_group_id: grp_buttons
+      sorting_weight: 2
+
+  - platform: gpio
+    pin:
+      number: GPIO10
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    name: "Heating On Button"
+    id: btn_heat_on
+    web_server:
+      sorting_group_id: grp_buttons
+      sorting_weight: 3
+
+  - platform: gpio
+    pin:
+      number: GPIO9
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    name: "Power Button"
+    id: btn_power_off
+    web_server:
+      sorting_group_id: grp_buttons
+      sorting_weight: 4
+
+  - platform: gpio
+    pin:
+      number: GPIO19
+      mode:
+        input: true
+        pullup: true
+    name: "GPIO 19 Button"
+    id: gpio_19_btn
+    web_server:
+      sorting_group_id: grp_unknown
+      sorting_weight: 2
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+switch:
+  - platform: gpio
+    pin: GPIO4
+    name: "Filament Drying LED"
+    id: led_filament_dry
+    web_server:
+      sorting_group_id: grp_leds
+      sorting_weight: 1
+
+  - platform: gpio
+    pin: GPIO6
+    name: "Heating Auto LED"
+    id: led_heat_auto
+    web_server:
+      sorting_group_id: grp_leds
+      sorting_weight: 2
+
+  - platform: gpio
+    pin: GPIO5
+    name: "Heating On LED"
+    id: led_heat_on
+    web_server:
+      sorting_group_id: grp_leds
+      sorting_weight: 3
+
+  - platform: gpio
+    pin: GPIO3
+    name: "Fan"
+    id: fan_enable
+    web_server:
+      sorting_group_id: grp_control
+      sorting_weight: 1
+
+  - platform: gpio
+    pin: GPIO18
+    name: "PTC Heater"
+    id: heater_enable
+    web_server:
+      sorting_group_id: grp_control
+      sorting_weight: 2
+
+  - platform: gpio
+    pin: GPIO21  # shared with UART0 TX (CH342) — works only with logger level: NONE
+    name: "Power LED"
+    id: led_power
+    web_server:
+      sorting_group_id: grp_leds
+      sorting_weight: 4
